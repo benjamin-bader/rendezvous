@@ -13,8 +13,6 @@ const (
 )
 
 type (
-	HashProvider func() hash.Hash64
-
 	// A Ring is a collection of nodes making up a rendezvous group.
 	// Nodes have a label and, optionally, a weight.  If unspecified,
 	// a default weighting is used.
