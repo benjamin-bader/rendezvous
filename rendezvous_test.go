@@ -3,7 +3,6 @@ package rendezvous
 import (
 	"fmt"
 	"github.com/cespare/xxhash/v2"
-	"hash"
 	"math"
 	"reflect"
 	"strconv"
@@ -77,7 +76,7 @@ func TestRing_AddWithWeight(t *testing.T) {
 
 func TestRing_Lookup(t *testing.T) {
 	t.Run("IsBasicallyAccurate", func(t *testing.T) {
-		rv := NewWithHashProvider(func() hash.Hash64 { return xxhash.New() })
+		rv := NewWithHash(xxhash.New())
 		rv.AddWithWeight("x", 1.0)
 		rv.AddWithWeight("y", 0.5)
 		rv.AddWithWeight("z", 0.5)

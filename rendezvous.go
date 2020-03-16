@@ -31,10 +31,10 @@ type (
 )
 
 func New() *Ring {
-	return NewWithHashProvider(fnv.New64a())
+	return NewWithHash(fnv.New64a())
 }
 
-func NewWithHashProvider(h hash.Hash64) *Ring {
+func NewWithHash(h hash.Hash64) *Ring {
 	return &Ring{
 		nodes: make([]*node, 0),
 		h:     h,
