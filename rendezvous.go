@@ -5,66 +5,79 @@ import (
 	"hash/fnv"
 	"io"
 	"math"
-	"sync"
+	"sort"
 )
 
-type HashProvider func() hash.Hash64
+const (
+	defaultWeight = 1.0
+)
 
-type node struct {
-	name   string
-	hash   uint64
-	weight float64
-}
+type (
+	HashProvider func() hash.Hash64
 
-type Ring struct {
-	nodes map[string]*node
-	hp    HashProvider
-	m     sync.RWMutex
-}
+	// A Ring is a collection of nodes making up a rendezvous group.
+	// Nodes have a label and, optionally, a weight.  If unspecified,
+	// a default weighting is used.
+	Ring struct {
+		nodes []*node
+		h     hash.Hash64
+	}
+
+	node struct {
+		name   string
+		hash   uint64
+		weight float64
+	}
+)
 
 func New() *Ring {
-	return NewWithHashProvider(fnv.New64a)
+	return NewWithHashProvider(fnv.New64a())
 }
 
-func NewWithHashProvider(hp HashProvider) *Ring {
+func NewWithHashProvider(h hash.Hash64) *Ring {
 	return &Ring{
-		nodes: make(map[string]*node),
-		hp:    hp,
+		nodes: make([]*node, 0),
+		h:     h,
 	}
 }
 
 func (r *Ring) Add(name string) {
-	r.AddWithWeight(name, 1.0)
+	r.AddWithWeight(name, defaultWeight)
 }
 
 func (r *Ring) AddWithWeight(name string, weight float64) {
-	r.m.Lock()
-	defer r.m.Unlock()
+	var ix int
+	if len(r.nodes) > 0 {
+		ix = sort.Search(len(r.nodes), r.cmp(name))
+	}
 
-	n := r.nodes[name]
-	if n == nil {
-		n = &node{
+	if ix < len(r.nodes) && r.nodes[ix].name == name {
+		r.nodes[ix].weight = weight
+	} else {
+		n := &node{
 			name:   name,
 			hash:   r.hash(name),
 			weight: weight,
 		}
-		r.nodes[name] = n
-	} else {
-		n.weight = weight
+		r.nodes = append(r.nodes, nil)
+		copy(r.nodes[ix+1:], r.nodes[ix:])
+		r.nodes[ix] = n
 	}
 }
 
 func (r *Ring) Remove(node string) {
-	r.m.Lock()
-	defer r.m.Unlock()
+	ix := sort.Search(len(r.nodes), r.cmp(node))
+	if ix == len(r.nodes) {
+		return
+	}
 
-	delete(r.nodes, node)
+	if r.nodes[ix].name == node {
+		copy(r.nodes[:ix], r.nodes[:ix+1])
+		r.nodes = r.nodes[:len(r.nodes)-1]
+	}
 }
 
 func (r *Ring) Lookup(key string) string {
-	r.m.RLock()
-	defer r.m.RUnlock()
-
 	keyHash := r.hash(key)
 
 	maxScore := -math.MaxFloat64
@@ -85,9 +98,15 @@ func (r *Ring) Lookup(key string) string {
 }
 
 func (r *Ring) hash(s string) uint64 {
-	h := r.hp()
-	_, _ = io.WriteString(h, s)
-	return h.Sum64()
+	r.h.Reset()
+	_, _ = io.WriteString(r.h, s)
+	return r.h.Sum64()
+}
+
+func (r *Ring) cmp(name string) func(int) bool {
+	return func(i int) bool {
+		return r.nodes[i].name >= name
+	}
 }
 
 func computeScore(keyHash, nodeHash uint64, nodeWeight float64) float64 {
