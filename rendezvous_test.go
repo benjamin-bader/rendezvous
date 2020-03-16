@@ -130,7 +130,7 @@ func TestRing_Lookup(t *testing.T) {
 		}
 
 		if numFailed != 0 {
-			t.Logf("%f failed", float64(numFailed) / float64(len(mappings)))
+			t.Logf("%f failed", float64(numFailed)/float64(len(mappings)))
 		}
 	})
 }
